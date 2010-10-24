@@ -82,14 +82,27 @@ gfloppy: gimage
 	@sudo dd if=$(image_f) of=$(mnt_floppy_f) bs=9216 2>/dev/null
 	@echo
 
-bochs: msg
+../.bochslog:
+	@echo "creating ../.bochslog"
+	@mknod ../.bochslog p
+../.bochsrc: Makefile
+	@echo "creating ../.bochsrc"
+	@echo -e "boot:a \nfloppya:1_44=$(image_f),status=inserted \nconfig_interface:textconfig \ndisplay_library:x \nlog:../.bochslog" >../.bochsrc
+../.bochsrcDebug: Makefile
+	@echo "creating ../.bochsrcDebug"
+	@echo -e "boot:a \nfloppya:1_44=$(image_f),status=inserted \nconfig_interface:textconfig \ndisplay_library:x, options=gui_debug \nlog:../.bochslog" >../.bochsrcDebug
+../.bochsDebugContinue: Makefile
+	@echo "creating ../.bochsDebugContinue"
+	@echo "continue" > ../.bochsDebugContinue
+
+bochs: msg ../.bochsrc | ../.bochslog
 	@echo "running bochs"
-	@- trap "" SIGINT; bochs -f ../bochsrc -q "boot:a" "floppya:1_44=$(image_f),status=inserted" "config_interface:textconfig" "display_library:x"  2>&1 | sed -e'1,176d'
+	@-trap "" SIGINT; sed '1,/Booting from/d' ../.bochslog & bochs -qf ../.bochsrc
 	@echo
 
-bochsd: msg
+bochsd: msg ../.bochsrcDebug ../.bochsDebugContinue | ../.bochslog
 	@echo "running bochsdebug"
-	@- IFS=''; trap "" SIGINT; n=0; bochsdebug -q "boot:a" "floppya:1_44=$(image_f),status=inserted" "config_interface:textconfig" "display_library:x" 2>&1 | while read -n 1 vari ;do     [ $$n -gt 114 ] && { [ -n "$$vari" ] && echo -n "$$vari" || echo ; } || [ -z "$$vari" ] && n=$$[n+1]     ;done
+	@-trap "" SIGINT; sed '1,/Booting from/d' ../.bochslog & bochsdebug -qf ../.bochsrcDebug -rc ../.bochsDebugContinue
 	@echo
 
 qemu: msg
