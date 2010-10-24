@@ -1,0 +1,20 @@
+# Lines starting with '#' are considered comments.
+# see gitignore(5) for more information.
+
+# ignore "private" stuff
+/OS-Documentation/
+/grub/
+
+# ignore bochs Configuration
+/.bochsrc
+/.bochsrcDebug
+/.bochsDebugContinue
+
+# ignore temporary files
+.*.swp
+*.~
+
+# ignore build files
+/build/
+*.o
+
