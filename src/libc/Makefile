@@ -6,20 +6,16 @@ else
 
 # Local variables
 
-TGTS_$(d)       := $(d)libc.a
-OBJS_$(d)       := $(patsubst $(SRCDIR)/%,%,$(patsubst %.c,%.o,$(wildcard $(SRCDIR)/$(d)*.c)))
+TGT_LIB_$(d)	:= $(d)libc.a
+OBJ_$(d)	:= $(patsubst $(SRCDIR)/%,%,$(patsubst %.c,%.o,$(wildcard $(SRCDIR)/$(d)*.c)))
 
-DEPS_$(d)       := $(OBJS_$(d):%=%.d)
-TGTDEPS_$(d)    := $(TGTS_$(d):%=%.d)
-CLEAN_$(d)      := $(OBJS_$(d)) $(DEPS_$(d)) $(TGTDEPS_$(d)) $(TGTS_$(d))
+DEP_OBJ_$(d)	:= $(OBJ_$(d):%=%.d)
 
 
 # Local rules
 
-$(d)libc.a: $(OBJS_$(d))
+$(TGT_LIB_$(d)): $(OBJ_$(d))
 
-$(OBJS_$(d)):   CF_TGT := -I$(SRCDIR)/$(d)
-
-TGT_BIN         := $(TGT_BIN) $(TGTS_$(d))
+$(OBJ_$(d)):	CF_TGT := -I$(SRCDIR)/$(d)
 
 endif

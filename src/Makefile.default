@@ -12,19 +12,16 @@ endif
 
 # Local variables
 
-TGTS_$(d)       := $(patsubst $(SRCDIR)/%,%,$(patsubst %.c,%,$(shell grep -l '^int main *([^()]*)' $(SRCDIR)/$(d)*.c 2>/dev/null)))
-OBJS_$(d)       := $(patsubst $(SRCDIR)/%,%,$(patsubst %.c,%.o,$(wildcard $(SRCDIR)/$(d)*.c)))
-OBJS_$(d)       += $(patsubst $(SRCDIR)/%,%,$(patsubst %.asm,%.o,$(wildcard $(SRCDIR)/$(d)*.asm)))
+TGT_BIN_$(d)	:= $(patsubst $(SRCDIR)/%,%,$(patsubst %.c,%,$(shell grep -l '^int main *([^()]*)' $(SRCDIR)/$(d)*.c 2>/dev/null)))
+OBJ_$(d)	:= $(patsubst $(SRCDIR)/%,%,$(patsubst %.c,%.o,$(wildcard $(SRCDIR)/$(d)*.c)))
+OBJ_$(d)	+= $(patsubst $(SRCDIR)/%,%,$(patsubst %.asm,%.o,$(wildcard $(SRCDIR)/$(d)*.asm)))
 
-DEPS_$(d)       := $(OBJS_$(d):%=%.d)
-TGTDEPS_$(d)    := $(TGTS_$(d):%=%.d)
-CLEAN_$(d)      := $(OBJS_$(d)) $(DEPS_$(d)) $(TGTDEPS_$(d)) $(TGTS_$(d))
+DEP_OBJ_$(d)	:= $(OBJS_$(d):%=%.d)
+DEP_TGT_$(d)	:= $(TGTS_$(d):%=%.d)
 
 
 # Local rules
 
-$(OBJS_$(d)):   CF_TGT := -I$(SRCDIR)/$(d) -isystem $(SRCDIR)/libc
-
-TGT_BIN         := $(TGT_BIN) $(TGTS_$(d))
+$(OBJS_$(d)):	CF_TGT := -I$(SRCDIR)/$(d) -isystem $(SRCDIR)/libc
 
 endif

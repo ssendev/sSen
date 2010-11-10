@@ -2,11 +2,11 @@
 
 BUILDDIR=../build
 
-CF_ALL          = -Wall		# C Flags
+CF_ALL          = -Wall# C Flags
 #CF_ALL		+= -nostdinc -fno-builtin # uncomment if compiler includes default stdlibrarys
-LF_ALL          = -Llibc	# Linker Flags
-LL_ALL          = -lc		# Link Librarys
-AF_ALL          =		# Assembler Flags
+LF_ALL          = -Llibc# Linker Flags
+LL_ALL          = -lc# Link Librarys
+AF_ALL          =# Assembler Flags
 
 LOCALTARGETNAMES= # set LOCALTARGETNAMES to empty if 'make foo' should always mean srcdir/foo and not srcdir/currentdir/foo
 S= # silent: S='1':no color info of the current target, S='': show name of currently precessed target
@@ -37,6 +37,7 @@ define COMP
 		 ; rm -f $*.d
 endef
 LINK            = $(LD) $(LF_ALL) $(LF_TGT) -o $@ $^ $(LL_TGT) $(LL_ALL)
+ARCHIVE		= $(AR) -crs $@ $?
 ASSEMBLE	= $(NASM) -f elf $(AF_ALL) $(AF_TGT) -o $@ $<
 ASSEMBLEBIN	= $(NASM) -f bin $(AF_ALL) $(AF_TGT) -o $@ $<
 MAKEDIR		= mkdir -p $@
@@ -53,34 +54,51 @@ all:		targets
 
 %.bin:		%.asm
 		@test $(S) || echo -n '[01;33m$@:[0m '
+#		sleep 5
 		$(ASSEMBLEBIN)
 
 %.o:		%.c
 		@test $(S) || echo -n '[01;33m$@:[0m '
 		$(COMP)
+		@#[ -f $(patsubst %.o,%.dd,$@) ] && touch $(patsubst %.o,%.dd,$@) || true
+		@#touch -t 197001010101 $(patsubst %.o,%.d,$@)
+#		$(eval include $(patsubst %.o,%.d,$@))
 
 %.a:
 		@test $(S) || echo -n '[01;32m$@:[0m '
-		$(AR) -crs $@ $?
+		$(ARCHIVE)
 
 %:		%.o
 		@test $(S) || echo -n '[01;32m$@:[0m '
 		$(LINK)
 
-%.d:		%.o
+%.dd:		%.c
 		@test $(S) || echo '[01;36m$@:[0m '
-		@[ -f $*.o.d ] && { cat $*.o.d | sed -ne '1{:s;s/\\$$/\\/;Te;N;bs;:e;s|.*:|$*:|; s/\.c\|\.h/.o/g; p;}' > $*.d; }
+#		use .o.d if exist
+		@$(CC) -MM -MQ $* -MF $@ $(CF_ALL) $(CF_TGT) $<
+#		generate dependencies of target (all included .h files which have a .c file (all .o files))
+		@(echo "$*: $*.o " \
+		&& ls xXxXx $$(sed -e '1s/[^ ]* [^ ]*//; s/\\$$\|$$/ /; s/\.h /.c /g' <$@) 2>/dev/null) \
+		| sed -e 's/$$/ \\/; $$s/\\$$//; s/\.c /.o /g' >$@~ \
+		&& sed -e '1s/:/.dd:/' <$@ >>$@~ \
+		&& sed -e '1s/.*://; s/$$\|\\$$/:/' <$@ >>$@~ \
+		&& sed -e 's:\(^\| \)\$(SRCDIR)/:\1:g;' <$@~ >$@ \
+		; rm $@~
 
 # .d files for non targets dont need to be remade prior to compiling (they are only interesting for the next run)
 %.o.d: ;
 
+DOCLEAN=$(filter clean clean.d,$(MAKECMDGOALS))
+.PHONY:		clean.d
+clean.d:
+		rm -f  $(strip $(DEP_OBJ) $(DEP_TGT))
 .PHONY:		clean
 clean:
 ifneq (,$(filter-out clean,$(MAKECMDGOALS)))
 		$(error clean must be executed alone)
 else
-		rm -f $(CLEAN)
-		$(eval CLEANDIRS:=$(wildcard $(CLEANDIR)))
+		rm -f $(strip $(TGT_BIN) $(TGT_SBIN) $(TGT_ETC) $(TGT_LIB) $(OBJ) $(DEP_OBJ) $(DEP_TGT))
+		$(eval CLEANDIRS:=$(wildcard $(DIR_BUILD)))
 		$(if $(CLEANDIRS),rmdir $(CLEANDIRS),)
 endif
 
@@ -135,32 +153,54 @@ define SUBDIR_template
 
   include	$(2)
 
-  INCS:=$$(if $$(DOMAKEALL),$$(TGTDEPS_$$(d)),$$(filter $$(addsuffix .d,$$(MAKECMDGOALS)),$$(TGTDEPS_$$(d))))
-  ifneq (,$$(INCS))
-    #-include $$(DEPS_$$(d)) $$(INCS) # this line would be all thats needed but there is no silent include which causes errors, neccessitating the following construction
-    -include $$(DEPS_$$(d))
-    NEWINCS:=$$(filter-out $$(wildcard $$(INCS)),$$(INCS))
+  ifeq (,$$(DOCLEAN))
+    -include $$(DEP_OBJ_$$(d))
+    NEWINCS:=$$(filter-out $$(wildcard $$(DEP_TGT_$$(d))),$$(DEP_TGT_$$(d)))
     ifneq (,$$(NEWINCS))
-      _:=$$(shell mkdir -p ./$$(d); touch -t 197001010101 $$(NEWINCS))
+      $$(shell [ -e ./$$(d) ] || mkdir -p ./$$(d); touch -t 197001010101 $$(NEWINCS))
     endif
-    include $$(INCS)
+    include $$(DEP_TGT_$$(d))
   endif
 
-  $$(CLEAN_$$(d)):	| $$(d)
-  $$(d):
-		@$$(MAKEDIR)
+  ifneq (,$$(filter-out $$(wildcard $$(d)),$$(d)))
+#  this can cause make -j to fail (prune prematurely)
+#    $$(TGT_BIN_$$(d)) $$(TGT_SBIN_$$(d)) $$(TGT_ETC_$$(d)) $$(TGT_LIB_$$(d)) $$(OBJ_$$(d)) $$(DEP_OBJ_$$(d)) $$(DEP_TGT_$$(d)) :	| $$(d)
+#    $$(d):
+#		@$$(MAKEDIR)
+#  workaround:
+    $$(shell mkdir -p $$(d))
+  endif
 
-  CLEAN:=$$(CLEAN) $$(CLEAN_$$(d))
-  CLEANDIR:=$$(CLEANDIR) $$(d)
+  TGT_BIN	+= $$(TGT_BIN_$$(d))
+  TGT_SBIN	+= $$(TGT_SBIN_$$(d))
+  TGT_ETC	+= $$(TGT_ETC_$$(d))
+  TGT_LIB	+= $$(TGT_LIB_$$(d))
+  OBJ		+= $$(OBJ_$$(d))
+  DEP_OBJ	+= $$(DEP_OBJ_$$(d))
+  DEP_TGT	+= $$(DEP_TGT_$$(d))
+  DIR_BUILD	+= $$(d)
+
+#  CLEAN:=$$(CLEAN) $$(TGT_BIN) $$(TGT_SBIN) $$(TGT_ETC) $$(TGT_LIB) $$(OBJS_$$(d))
+#  CLEANDEPS:=$$(CLEANDEPS) $$(DEPS_$$(d)) $$(TGTDEPS_$$(d)))
+#  CLEANDIR:=$$(CLEANDIR) $$(d)
   d		:= $$(dirstack_$$(sp))
   sp		:= $$(basename $$(sp))
-endef 
+endef
+
+
+TGT_BIN		:=
+TGT_SBIN	:=
+TGT_ETC		:=
+TGT_LIB		:=
+OBJ		:=
+DEP_OBJ		:=
+DEP_TGT		:=
+DIR_BUILD	:=
 
 DIRS	:= . # include Makefile from same directory
 ifneq (,$(DIRS))
   $(foreach DIR,$(DIRS),$(eval $(call SUBDIR_template,$(DIR),$(SRCDIR)/Makefile)))
 endif
-
 
 # The variables TGT_*, CLEAN and CMD_INST* may be added to by the Makefile
 # fragments in the various subdirectories.
@@ -169,7 +209,7 @@ endif
 targets:	$(TGT_BIN) $(TGT_SBIN) $(TGT_ETC) $(TGT_LIB)
 
 # Prevent make from removing any build targets, including intermediate ones
-.SECONDARY:	$(CLEAN)
+.SECONDARY:	$(TGT_BIN) $(TGT_SBIN) $(TGT_ETC) $(TGT_LIB) $(OBJ) $(DEP_OBJ) $(DEP_TGT) $(DIR_BUILD)
 
 
 
@@ -181,8 +221,8 @@ all $(filter-out all,$(MAKECMDGOALS)) :
 	@[ -n "$(DIDIT)" ] || { \
 		absrootdir="$$(cd ./$(ROOTDIR); pwd)"; \
 		[ "$$absrootdir" != "$(CURDIR)" $(if $(LOCALTARGETNAMES),,-a 1 -eq 2) ] && { LOCAL=$$(echo '$(CURDIR)'|cut -c $$(expr length "  $$absrootdir")-); [ -n "$$LOCAL" ] && LOCAL=$$LOCAL/;} || LOCAL=; \
-		cGOAL=;aGOAL=;lGOAL=; for G in $(MAKECMDGOALS);do echo $$G|grep -qs '^\(all\|clean\|run\|install\)$$' \
-			&& { echo $$G|grep -qs 'clean'&&cGOAL+="$$G "||aGOAL+="$$G ";} || lGOAL+=$$(echo "$$LOCAL$$G "|sed ':a;s|[^/]*/\.\./||;ta') ;done; \
+		cGOAL=;aGOAL=;lGOAL=; for G in $(MAKECMDGOALS);do echo $$G|grep -qs '^\(all\|clean.*\|run\|install\)$$' \
+			&& { echo $$G|grep -qs 'clean.*'&&cGOAL+="$$G "||aGOAL+="$$G ";} || lGOAL+=$$(echo "$$LOCAL$$G "|sed ':a;s|[^/]*/\.\./||;ta') ;done; \
 		[ "$(BUILDDIR)" != . ] \
 		&&	reversepath="$$(echo $$absrootdir | sed 's|^|\n|; :a;s|\([^\n]*\)\n\(.*\)/\(.*\)|\1/\3\n\2|;ta; s/\n$$//')" && \
 			regexp="$$(echo $$reversepath | sed 's~/[^/]*~s|/:\\([^:]*\\)$$|&\\1|;  ~g')" && \
@@ -191,11 +231,11 @@ all $(filter-out all,$(MAKECMDGOALS)) :
 		mkdir -p ./$(ROOTDIR)/$(BUILDDIR); cd ./$(ROOTDIR)/$(BUILDDIR); cd "$$srcdir"; \
 		[ "$$absrootdir" != "$$(pwd)" ] && { echo "Relative path did not match [ '$$absrootdir/''$(BUILDDIR)/''$$srcdir' is '$$(pwd)' and not '$(CURDIR)/$(ROOTDIR)' ]"; exit 2; } || { \
 			[ -n "$$cGOAL" ] \
-				&& { $(MAKE) --no-print-directory -C "$(BUILDDIR)" -f $$srcdir/Makefile.root SRCDIR="$$srcdir" $$cGOAL || exit $$?; }; \
-			[ -z "$(MAKECMDGOALS)" -o -n "$$aGOAL$$lGOAL" ] && mkdir -p $(BUILDDIR) \
-				&& { $(MAKE) --no-print-directory -C "$(BUILDDIR)" -f $$srcdir/Makefile.root SRCDIR="$$srcdir" $$lGOAL $$aGOAL || exit $$?; }; : ; \
+				&& { $(MAKE) --no-print-directory -C "$(BUILDDIR)" -f $$srcdir/Makefile.root SRCDIR="$$srcdir" $$cGOAL || endmake=y; }; \
+			[ \( -z "$(MAKECMDGOALS)" -o -n "$$aGOAL$$lGOAL" \) -a -z "$$endmake" ] && mkdir -p $(BUILDDIR) \
+				&& { $(MAKE) --no-print-directory -C "$(BUILDDIR)" -f $$srcdir/Makefile.root SRCDIR="$$srcdir" $$lGOAL $$aGOAL ; }; : ; \
 		}; \
-	}
+	};
 	$(eval DIDIT=yes)
 endif
 # shorten debug-output

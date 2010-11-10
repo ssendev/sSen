@@ -12,8 +12,8 @@ endif
 
 # Local variables
 
-TGTS_$(d)	:=
-OBJS_$(d)       :=
+TGT_BIN_$(d)	:=
+OBJ_$(d)	:=
 
 # Local rules
 
@@ -32,7 +32,8 @@ IMG = ssen
 help:
 	@echo "try: boot/boot.bin, kernel/main, ssen.img, ssen_grub.img, [g]floppy, bochs[d], qemu, clean"
 
-OBJS_$(d) += $(IMG)_boot.img
+
+OBJ_$(d)	+= $(IMG)_boot.img
 $(IMG)_boot.img:	$(BOOTBIN)
 	@test $(S) || echo '[01;32m$@:[0m '
 	cp $(BOOTBIN) $@
@@ -40,7 +41,7 @@ $(IMG)_boot.img:	$(BOOTBIN)
 	printf "\\760\\777\\777\\000" | dd of=$@ ibs=1 obs=512 seek=10 2>/dev/null
 	dd if=/dev/zero of=$@ bs=512 count=1 seek=2879 2>/dev/null
 
-TGTS_$(d) += $(IMG).img
+TGT_BIN_$(d)	+= $(IMG).img
 $(IMG).img:	$(IMG)_boot.img $(KERNELBINSRC)
 	@test $(S) || echo '[01;32m$@:[0m '
 	cp $< $@
@@ -50,7 +51,7 @@ $(IMG).img:	$(IMG)_boot.img $(KERNELBINSRC)
 	-cp -r $(FLOPPYDIR)/* $(MOUNTDIR)
 	umount $@
 
-OBJS_$(d) += $(IMG)_grub.img
+OBJ_$(d)	+= $(IMG)_grub.img
 $(IMG)_grub.img:	$(KERNELBINSRC)
 	@test $(S) || echo '[01;32m$@:[0m '
 	cp $(SRCDIR)/../grub/grub.img $@
@@ -83,19 +84,19 @@ umount:
 	umount $(MOUNTDIR)
 
 
-OBJS_$(d) += bochslog
+OBJ_$(d)	+= bochslog
 bochslog:
 	@test $(S) || echo '[01;33m$@:[0m '
 	mknod $@ p
-OBJS_$(d) += bochsrc
+OBJ_$(d)	+= bochsrc
 bochsrc: Makefile
 	@test $(S) || echo '[01;33m$@:[0m '
 	echo -e "boot:a \nfloppya:1_44=$(IMG).img,status=inserted \nconfig_interface:textconfig \ndisplay_library:x \nlog:bochslog" >$@
-OBJS_$(d) += bochsrcDebug
+OBJ_$(d)	+= bochsrcDebug
 bochsrcDebug: Makefile
 	@test $(S) || echo '[01;33m$@:[0m '
 	echo -e "boot:a \nfloppya:1_44=$(IMG).img,status=inserted \nconfig_interface:textconfig \ndisplay_library:x, options=gui_debug \nlog:bochslog" >$@
-OBJS_$(d) += bochsDebugContinue
+OBJ_$(d)	+= bochsDebugContinue
 bochsDebugContinue: Makefile
 	@test $(S) || echo '[01;33m$@:[0m '
 	echo "continue" >$@
@@ -113,13 +114,5 @@ bochsd: $(IMG).img bochsrcDebug bochsDebugContinue | bochslog
 qemu: $(IMG).img
 	@test $(S) || echo '[01;33m$@:[0m '
 	-qemu -m 32 -fda $(IMG).img
-
-
-
-
-
-CLEAN_$(d)      := $(OBJS_$(d)) $(TGTS_$(d))
-
-TGT_BIN         := $(TGT_BIN) $(TGTS_$(d))
 
 endif

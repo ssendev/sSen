@@ -6,18 +6,6 @@ else
 
 # Local variables
 
-TGTS_$(d)       := $(d)boot.bin
-OBJS_$(d)       := $(patsubst $(SRCDIR)/%,%,$(patsubst %.c,%.o,$(wildcard $(SRCDIR)/$(d)*.c)) $(patsubst %.asm,%.o,$(wildcard $(SRCDIR)/$(d)*.asm)))
-
-DEPS_$(d)       := $(OBJS_$(d):%=%.d)
-TGTDEPS_$(d)    := $(TGTS_$(d):%=%.d)
-CLEAN_$(d)      := $(OBJS_$(d)) $(DEPS_$(d)) $(TGTDEPS_$(d)) $(TGTS_$(d))
-
-
-# Local rules
-
-$(OBJS_$(d)):   CF_TGT := -I$(SRCDIR)/$(d) -isystem $(SRCDIR)/libc
-
-TGT_BIN         := $(TGT_BIN) $(TGTS_$(d))
+TGT_BIN_$(d)	:= $(d)boot.bin
 
 endif
